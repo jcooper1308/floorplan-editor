@@ -1698,6 +1698,7 @@
                     
                     // Save state to capture the deletion
                     saveState('Delete Selection');
+                    showMessage("Selection deleted");
                 }
             }
         }
@@ -2223,10 +2224,12 @@
             const layerCtx = getCurrentLayerContext();
             if (!layerCtx) return;
             
+            // Get the image data from the current layer
             clipboard = {
                 imageData: layerCtx.getImageData(selection.x, selection.y, selection.width, selection.height),
                 width: selection.width,
-                height: selection.height
+                height: selection.height,
+                originalLayer: currentLayer
             };
             
             showMessage("Selection copied");
@@ -2249,13 +2252,31 @@
                 return;
             }
             
+            // Create a new layer for the pasted content
+            const layerCanvas = document.createElement('canvas');
+            layerCanvas.width = canvas.width;
+            layerCanvas.height = canvas.height;
+            
+            const layer = {
+                id: Date.now(),
+                name: `Pasted Item`,
+                canvas: layerCanvas,
+                visible: true,
+                opacity: 1
+            };
+            
+            layers.push(layer);
+            currentLayer = layers.length - 1;
+            updateLayersList();
+            
             const layerCtx = getCurrentLayerContext();
             if (!layerCtx) return;
             
-            // Paste at center of canvas or at last selection position
-            const pasteX = selection ? selection.x : (canvas.width - clipboard.width) / 2;
-            const pasteY = selection ? selection.y : (canvas.height - clipboard.height) / 2;
+            // Paste at center of canvas or offset from original
+            const pasteX = canvas.width / 2 - clipboard.width / 2;
+            const pasteY = canvas.height / 2 - clipboard.height / 2;
             
+            // Put the clipboard image data onto the new layer
             layerCtx.putImageData(clipboard.imageData, pasteX, pasteY);
             
             // Create new selection at paste location
@@ -2266,10 +2287,11 @@
                 height: clipboard.height
             };
             
+            // Update visuals
             showTransformHandles();
             redrawCanvas();
-            saveState();
-            showMessage("Pasted");
+            saveState('Paste');
+            showMessage("Pasted to new layer");
         }
 
         function selectAll() {
