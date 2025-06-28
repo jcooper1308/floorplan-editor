@@ -188,7 +188,101 @@
         }
 
         .properties-panel {
+            max-height: 300px;
+        }
+
+        .brush-type-selector {
+            display: flex;
+            gap: 5px;
+            margin-top: 5px;
+        }
+
+        .brush-type-btn {
+            width: 40px;
+            height: 40px;
+            background: #333;
+            border: 2px solid #555;
+            color: #fff;
+            cursor: pointer;
+            border-radius: 3px;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .brush-type-btn:hover {
+            background: #444;
+            border-color: #666;
+        }
+
+        .brush-type-btn.active {
+            background: #0078d4;
+            border-color: #0078d4;
+        }
+
+        .property-value {
+            font-size: 10px;
+            color: #aaa;
+            margin-left: 5px;
+        }
+
+        .history-panel {
             max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            display: flex;
+            align-items: center;
+            padding: 5px 8px;
+            margin: 2px 0;
+            background: #333;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: background 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .history-item:hover {
+            background: #444;
+        }
+
+        .history-item.current {
+            background: #0078d4;
+            border-color: #106ebe;
+        }
+
+        .history-thumbnail {
+            width: 40px;
+            height: 30px;
+            background: #222;
+            border: 1px solid #555;
+            margin-right: 8px;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .history-thumbnail canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .history-info {
+            flex: 1;
+        }
+
+        .history-action {
+            font-size: 11px;
+            color: #fff;
+            font-weight: 500;
+        }
+
+        .history-time {
+            font-size: 9px;
+            color: #aaa;
         }
 
         .property-group {
@@ -369,13 +463,14 @@
                     <div class="property-group">
                         <label class="property-label">Brush Size</label>
                         <input type="range" class="property-input" id="brushSize" min="1" max="50" value="5">
+                        <span class="property-value" id="brushSizeValue">5px</span>
                     </div>
                     <div class="property-group">
-                        <label class="property-label">Brush Tip</label>
-                        <select class="property-input" id="brushTip">
-                            <option value="round">Round</option>
-                            <option value="square">Square</option>
-                        </select>
+                        <label class="property-label">Brush Type</label>
+                        <div class="brush-type-selector">
+                            <button class="brush-type-btn active" data-type="round" title="Round Brush">●</button>
+                            <button class="brush-type-btn" data-type="square" title="Square Brush">■</button>
+                        </div>
                     </div>
                     <div class="property-group">
                         <label class="property-label">Color</label>
@@ -384,7 +479,15 @@
                     <div class="property-group">
                         <label class="property-label">Opacity</label>
                         <input type="range" class="property-input" id="opacity" min="0" max="100" value="100">
+                        <span class="property-value" id="opacityValue">100%</span>
                     </div>
+                </div>
+            </div>
+
+            <div class="panel history-panel">
+                <div class="panel-header">History</div>
+                <div class="panel-content">
+                    <div id="historyList"></div>
                 </div>
             </div>
         </div>
@@ -401,10 +504,11 @@
         let layers = [];
         let currentLayer = 0;
         let history = [];
-        let historyStep = 0;
+        let historyStep = -1;
         let zoom = 1;
         let selection = null;
         let transforming = false;
+        let currentBrushType = 'round';
 
         // Initialize editor
         function init() {
@@ -431,6 +535,24 @@
                     currentTool = e.target.dataset.tool;
                     canvas.style.cursor = getCursor(currentTool);
                 });
+            });
+
+            // Brush type selection
+            document.querySelectorAll('.brush-type-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelector('.brush-type-btn.active').classList.remove('active');
+                    e.target.classList.add('active');
+                    currentBrushType = e.target.dataset.type;
+                });
+            });
+
+            // Property value updates
+            document.getElementById('brushSize').addEventListener('input', (e) => {
+                document.getElementById('brushSizeValue').textContent = e.target.value + 'px';
+            });
+
+            document.getElementById('opacity').addEventListener('input', (e) => {
+                document.getElementById('opacityValue').textContent = e.target.value + '%';
             });
 
             // Canvas events
@@ -648,7 +770,6 @@
             const size = document.getElementById('brushSize').value;
             const color = document.getElementById('brushColor').value;
             const opacity = document.getElementById('opacity').value / 100;
-            const brushTip = document.getElementById('brushTip').value;
             
             // Get the current layer's context
             const layerCtx = getCurrentLayerContext();
@@ -658,7 +779,7 @@
             layerCtx.globalAlpha = opacity;
             
             // Set brush tip shape
-            if (brushTip === 'round') {
+            if (currentBrushType === 'round') {
                 layerCtx.lineCap = 'round';
                 layerCtx.lineJoin = 'round';
             } else {
@@ -803,7 +924,7 @@
             layers.push(layer);
             currentLayer = layers.length - 1;
             updateLayersList();
-            saveState();
+            saveState('Add Layer');
         }
 
         function updateLayersList() {
@@ -905,16 +1026,28 @@
             ctx.globalAlpha = 1;
         }
 
-        function saveState() {
+        function saveState(actionName = 'Action') {
+            // Create thumbnail
+            const thumbnailCanvas = document.createElement('canvas');
+            thumbnailCanvas.width = 40;
+            thumbnailCanvas.height = 30;
+            const thumbnailCtx = thumbnailCanvas.getContext('2d');
+            
+            // Scale down main canvas to create thumbnail
+            thumbnailCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, 40, 30);
+            
             // Remove future history if we're not at the end
             if (historyStep < history.length - 1) {
                 history = history.slice(0, historyStep + 1);
             }
             
-            // Create a deep copy of the current state
+            // Create state object
             const state = {
+                id: Date.now(),
+                action: actionName,
+                timestamp: new Date(),
+                thumbnail: thumbnailCanvas.toDataURL(),
                 layers: layers.map(layer => {
-                    // Create a temporary canvas to get image data
                     const tempCanvas = document.createElement('canvas');
                     tempCanvas.width = layer.canvas.width;
                     tempCanvas.height = layer.canvas.height;
@@ -937,10 +1070,61 @@
             history.push(state);
             historyStep++;
             
-            // Limit history size to prevent memory issues
-            if (history.length > 50) {
+            // Limit history size
+            if (history.length > 30) {
                 history.shift();
                 historyStep--;
+            }
+            
+            updateHistoryPanel();
+        }
+
+        function updateHistoryPanel() {
+            const historyList = document.getElementById('historyList');
+            historyList.innerHTML = '';
+            
+            history.forEach((state, index) => {
+                const historyItem = document.createElement('div');
+                historyItem.className = `history-item ${index === historyStep ? 'current' : ''}`;
+                
+                const thumbnail = document.createElement('div');
+                thumbnail.className = 'history-thumbnail';
+                const thumbnailImg = document.createElement('img');
+                thumbnailImg.src = state.thumbnail;
+                thumbnailImg.style.width = '100%';
+                thumbnailImg.style.height = '100%';
+                thumbnail.appendChild(thumbnailImg);
+                
+                const info = document.createElement('div');
+                info.className = 'history-info';
+                
+                const action = document.createElement('div');
+                action.className = 'history-action';
+                action.textContent = state.action;
+                
+                const time = document.createElement('div');
+                time.className = 'history-time';
+                time.textContent = state.timestamp.toLocaleTimeString();
+                
+                info.appendChild(action);
+                info.appendChild(time);
+                
+                historyItem.appendChild(thumbnail);
+                historyItem.appendChild(info);
+                
+                historyItem.addEventListener('click', () => {
+                    historyStep = index;
+                    restoreState(state);
+                    updateHistoryPanel();
+                });
+                
+                historyList.appendChild(historyItem);
+            });
+            
+            // Scroll to current item
+            const currentItem = historyList.querySelector('.current');
+            if (currentItem) {
+                currentItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
         }
 
@@ -948,6 +1132,7 @@
             if (historyStep > 0) {
                 historyStep--;
                 restoreState(history[historyStep]);
+                updateHistoryPanel();
             }
         }
 
@@ -955,6 +1140,7 @@
             if (historyStep < history.length - 1) {
                 historyStep++;
                 restoreState(history[historyStep]);
+                updateHistoryPanel();
             }
         }
 
@@ -966,29 +1152,11 @@
             canvas.width = state.canvasWidth;
             canvas.height = state.canvasHeight;
             
-            // Restore layers
-            let loadedLayers = 0;
-            const totalLayers = state.layers.length;
-            
+            // Restore layers synchronously
             state.layers.forEach((layerData, index) => {
                 const layerCanvas = document.createElement('canvas');
                 layerCanvas.width = state.canvasWidth;
                 layerCanvas.height = state.canvasHeight;
-                const layerCtx = layerCanvas.getContext('2d');
-                
-                const img = new Image();
-                img.onload = () => {
-                    layerCtx.drawImage(img, 0, 0);
-                    loadedLayers++;
-                    
-                    // When all layers are loaded, redraw the canvas
-                    if (loadedLayers === totalLayers) {
-                        redrawCanvas();
-                    }
-                };
-                
-                // Set empty image data if none exists
-                img.src = layerData.imageData || 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
                 
                 const layer = {
                     id: layerData.id,
@@ -999,6 +1167,23 @@
                 };
                 
                 layers.push(layer);
+                
+                // Load image data
+                if (layerData.imageData) {
+                    const img = new Image();
+                    img.onload = () => {
+                        const layerCtx = layerCanvas.getContext('2d');
+                        layerCtx.drawImage(img, 0, 0);
+                        
+                        // Redraw canvas when last layer is loaded
+                        if (index === state.layers.length - 1) {
+                            redrawCanvas();
+                        }
+                    };
+                    img.src = layerData.imageData;
+                } else if (index === state.layers.length - 1) {
+                    redrawCanvas();
+                }
             });
             
             // Restore current layer
@@ -1006,11 +1191,6 @@
             
             // Update UI
             updateLayersList();
-            
-            // If no layers were restored, redraw immediately
-            if (totalLayers === 0) {
-                redrawCanvas();
-            }
         }
 
         function updateZoom() {
@@ -1437,7 +1617,7 @@
             brushPreview.style.height = previewSize + 'px';
             brushPreview.style.left = (pos.x * zoom - previewSize/2) + 'px';
             brushPreview.style.top = (pos.y * zoom - previewSize/2) + 'px';
-            brushPreview.style.borderRadius = brushTip === 'round' ? '50%' : '0';
+            brushPreview.style.borderRadius = currentBrushType === 'round' ? '50%' : '0';
             brushPreview.style.display = 'block';
         }
 
