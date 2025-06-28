@@ -1190,6 +1190,9 @@
         }
 
         function restoreState(state) {
+            // Remember current layer selection
+            const previousCurrentLayer = currentLayer;
+            
             // Clear current layers
             layers = [];
             
@@ -1231,8 +1234,12 @@
                 }
             });
             
-            // Restore current layer
-            currentLayer = Math.min(state.currentLayer, layers.length - 1);
+            // Keep current layer selection if possible, otherwise use a safe default
+            if (previousCurrentLayer < layers.length) {
+                currentLayer = previousCurrentLayer;
+            } else {
+                currentLayer = Math.max(0, layers.length - 1);
+            }
             
             // Update UI
             updateLayersList();
