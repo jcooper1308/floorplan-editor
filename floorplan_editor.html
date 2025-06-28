@@ -509,6 +509,8 @@
         let selection = null;
         let transforming = false;
         let currentBrushType = 'round';
+        let shiftPressed = false;
+        let lastX, lastY;
 
         // Initialize editor
         function init() {
@@ -565,6 +567,7 @@
 
             // Keyboard shortcuts
             document.addEventListener('keydown', handleKeyDown);
+            document.addEventListener('keyup', handleKeyUp);
         }
 
         function getCursor(tool) {
@@ -596,13 +599,20 @@
             const pos = getMousePos(e);
             startX = pos.x;
             startY = pos.y;
+            lastX = startX;
+            lastY = startY;
             isDrawing = true;
 
             if (currentTool === 'brush' || currentTool === 'eraser') {
                 const layerCtx = getCurrentLayerContext();
                 if (layerCtx) {
                     layerCtx.beginPath();
-                    layerCtx.moveTo(startX, startY);
+                    if (shiftPressed && lastX !== undefined && lastY !== undefined) {
+                        // Draw straight line from last position
+                        layerCtx.moveTo(lastX, lastY);
+                    } else {
+                        layerCtx.moveTo(startX, startY);
+                    }
                     setupBrush();
                 }
             } else if (currentTool === 'select') {
@@ -611,25 +621,41 @@
                 floodFill(Math.floor(startX), Math.floor(startY));
                 isDrawing = false;
                 redrawCanvas();
-                saveState();
+                saveState('Fill');
             }
         }
 
         function handleMouseMove(e) {
-            if (!isDrawing) return;
-
             const pos = getMousePos(e);
             const currentX = pos.x;
             const currentY = pos.y;
 
-            if (currentTool === 'brush' || currentTool === 'eraser') {
+            if (isDrawing && (currentTool === 'brush' || currentTool === 'eraser')) {
                 const layerCtx = getCurrentLayerContext();
                 if (layerCtx) {
-                    layerCtx.lineTo(currentX, currentY);
-                    layerCtx.stroke();
-                    redrawCanvas(); // Update main canvas
+                    if (shiftPressed) {
+                        // Draw straight line - clear and redraw from start
+                        layerCtx.clearRect(0, 0, layers[currentLayer].canvas.width, layers[currentLayer].canvas.height);
+                        
+                        // Restore the layer content first
+                        const imageData = layerCtx.getImageData(0, 0, layers[currentLayer].canvas.width, layers[currentLayer].canvas.height);
+                        layerCtx.putImageData(imageData, 0, 0);
+                        
+                        setupBrush();
+                        layerCtx.beginPath();
+                        const lineStartX = lastX !== undefined ? lastX : startX;
+                        const lineStartY = lastY !== undefined ? lastY : startY;
+                        layerCtx.moveTo(lineStartX, lineStartY);
+                        layerCtx.lineTo(currentX, currentY);
+                        layerCtx.stroke();
+                    } else {
+                        // Normal brush behavior
+                        layerCtx.lineTo(currentX, currentY);
+                        layerCtx.stroke();
+                    }
+                    redrawCanvas();
                 }
-            } else if (currentTool === 'select') {
+            } else if (isDrawing && currentTool === 'select') {
                 updateSelection(startX, startY, currentX, currentY);
             }
         }
@@ -642,22 +668,27 @@
             const endX = pos.x;
             const endY = pos.y;
 
-            if (currentTool === 'rect') {
+            if (currentTool === 'brush' || currentTool === 'eraser') {
+                // Update last position for next shift+click
+                lastX = endX;
+                lastY = endY;
+                redrawCanvas();
+                saveState(currentTool === 'brush' ? 'Brush Stroke' : 'Eraser');
+            } else if (currentTool === 'rect') {
                 drawRect(startX, startY, endX, endY);
                 redrawCanvas();
+                saveState('Rectangle');
             } else if (currentTool === 'circle') {
                 drawCircle(startX, startY, endX, endY);
                 redrawCanvas();
+                saveState('Circle');
             } else if (currentTool === 'line') {
                 drawLine(startX, startY, endX, endY);
                 redrawCanvas();
+                saveState('Line');
             } else if (currentTool === 'select') {
                 finalizeSelection();
-            } else if (currentTool === 'brush' || currentTool === 'eraser') {
-                redrawCanvas();
             }
-
-            saveState();
         }
 
         function handleWheel(e) {
@@ -668,6 +699,11 @@
         }
 
         function handleKeyDown(e) {
+            // Track shift key
+            if (e.key === 'Shift') {
+                shiftPressed = true;
+            }
+
             if (e.ctrlKey || e.metaKey) {
                 switch(e.key.toLowerCase()) {
                     case 'z':
@@ -758,11 +794,20 @@
                     switchToTool('text');
                     break;
                 case '[':
+                    e.preventDefault();
                     decreaseBrushSize();
                     break;
                 case ']':
+                    e.preventDefault();
                     increaseBrushSize();
                     break;
+            }
+        }
+
+        function handleKeyUp(e) {
+            // Track shift key release
+            if (e.key === 'Shift') {
+                shiftPressed = false;
             }
         }
 
