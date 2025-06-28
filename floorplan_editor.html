@@ -595,6 +595,9 @@
             return { x, y };
         }
 
+        // Global variables to track layer state
+        let layerSnapshots = new Map(); // Store snapshots when starting to draw
+
         function handleMouseDown(e) {
             const pos = getMousePos(e);
             startX = pos.x;
@@ -606,6 +609,14 @@
             if (currentTool === 'brush' || currentTool === 'eraser') {
                 const layerCtx = getCurrentLayerContext();
                 if (layerCtx) {
+                    // Take a snapshot of the current layer before starting to draw
+                    const tempCanvas = document.createElement('canvas');
+                    tempCanvas.width = layers[currentLayer].canvas.width;
+                    tempCanvas.height = layers[currentLayer].canvas.height;
+                    const tempCtx = tempCanvas.getContext('2d');
+                    tempCtx.drawImage(layers[currentLayer].canvas, 0, 0);
+                    layerSnapshots.set(currentLayer, tempCanvas);
+
                     layerCtx.beginPath();
                     if (shiftPressed && lastX !== undefined && lastY !== undefined) {
                         // Draw straight line from last position
@@ -632,15 +643,14 @@
 
             if (isDrawing && (currentTool === 'brush' || currentTool === 'eraser')) {
                 const layerCtx = getCurrentLayerContext();
-                if (layerCtx) {
+                if (layerCtx && layerSnapshots.has(currentLayer)) {
                     if (shiftPressed) {
-                        // Draw straight line - clear and redraw from start
+                        // For straight lines, restore from snapshot and draw line
+                        const snapshot = layerSnapshots.get(currentLayer);
                         layerCtx.clearRect(0, 0, layers[currentLayer].canvas.width, layers[currentLayer].canvas.height);
+                        layerCtx.drawImage(snapshot, 0, 0);
                         
-                        // Restore the layer content first
-                        const imageData = layerCtx.getImageData(0, 0, layers[currentLayer].canvas.width, layers[currentLayer].canvas.height);
-                        layerCtx.putImageData(imageData, 0, 0);
-                        
+                        // Draw the straight line
                         setupBrush();
                         layerCtx.beginPath();
                         const lineStartX = lastX !== undefined ? lastX : startX;
@@ -672,6 +682,10 @@
                 // Update last position for next shift+click
                 lastX = endX;
                 lastY = endY;
+                
+                // Clear the snapshot since we're done drawing
+                layerSnapshots.delete(currentLayer);
+                
                 redrawCanvas();
                 saveState(currentTool === 'brush' ? 'Brush Stroke' : 'Eraser');
             } else if (currentTool === 'rect') {
@@ -947,9 +961,20 @@
 
         function deleteSelection() {
             if (selection) {
-                ctx.clearRect(selection.x, selection.y, selection.width, selection.height);
-                hideSelection();
-                saveState();
+                const layerCtx = getCurrentLayerContext();
+                if (layerCtx) {
+                    // Clear the selected area on the current layer
+                    layerCtx.clearRect(selection.x, selection.y, selection.width, selection.height);
+                    
+                    // Immediately redraw the main canvas to show the change
+                    redrawCanvas();
+                    
+                    // Hide selection UI
+                    hideSelection();
+                    
+                    // Save state to capture the deletion
+                    saveState('Delete Selection');
+                }
             }
         }
 
