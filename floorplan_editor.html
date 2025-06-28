@@ -1,4 +1,124 @@
-<!DOCTYPE html>
+        // Temporarily disabled brush preview to fix errors
+        function showBrushPreview(e) {
+            // Disabled for now
+            return;
+        }
+
+        function hideBrushPreview() {
+            // Disabled for now
+            return;
+        }
+
+        // Tool control visibility
+        function updateToolControls() {
+            const wallControls = document.getElementById('wallControls');
+            
+            if (wallControls) {
+                wallControls.style.display = currentTool === 'wall' ? 'block' : 'none';
+            }
+        }
+
+        // Stamp functionality
+        function placeStamp(x, y) {
+            const layerCtx = getCurrentLayerContext();
+            if (!layerCtx) return;
+            
+            const stampSizes = {
+                stove: { width: 60, height: 60 },
+                sink: { width: 40, height: 30 },
+                toilet: { width: 30, height: 50 },
+                shower: { width: 80, height: 80 },
+                bed: { width: 100, height: 60 },
+                sofa: { width: 80, height: 40 },
+                table: { width: 60, height: 60 },
+                fridge: { width: 50, height: 30 },
+                door: { width: 80, height: 10 }
+            };
+            
+            const size = stampSizes[currentStamp] || { width: 50, height: 50 };
+            const opacity = document.getElementById('opacity') ? 
+                (parseInt(document.getElementById('opacity').value) || 100) / 100 : 1;
+            
+            layerCtx.globalAlpha = opacity;
+            layerCtx.strokeStyle = '#000000';
+            layerCtx.fillStyle = '#f0f0f0';
+            layerCtx.lineWidth = 2;
+            
+            const stampX = x - size.width / 2;
+            const stampY = y - size.height / 2;
+            
+            // Draw based on stamp type
+            switch (currentStamp) {
+                case 'stove':
+                    // Square with circles for burners
+                    layerCtx.fillRect(stampX, stampY, size.width, size.height);
+                    layerCtx.strokeRect(stampX, stampY, size.width, size.height);
+                    // Burners
+                    layerCtx.strokeStyle = '#666';
+                    for (let i = 0; i < 2; i++) {
+                        for (let j = 0; j < 2; j++) {
+                            layerCtx.beginPath();
+                            layerCtx.arc(stampX + 15 + i * 30, stampY + 15 + j * 30, 8, 0, 2 * Math.PI);
+                            layerCtx.stroke();
+                        }
+                    }
+                    break;
+                    
+                case 'sink':
+                    // Oval shape
+                    layerCtx.beginPath();
+                    layerCtx.ellipse(x, y, size.width/2, size.height/2, 0, 0, 2 * Math.PI);
+                    layerCtx.fill();
+                    layerCtx.stroke();
+                    break;
+                    
+                case 'toilet':
+                    // Rectangle for tank + oval for bowl
+                    layerCtx.fillRect(stampX + 5, stampY, size.width - 10, size.height * 0.4);
+                    layerCtx.strokeRect(stampX + 5, stampY, size.width - 10, size.height * 0.4);
+                    layerCtx.beginPath();
+                    layerCtx.ellipse(x, stampY + size.height * 0.7, size.width/2 - 2, size.height * 0.3, 0, 0, 2 * Math.PI);
+                    layerCtx.fill();
+                    layerCtx.stroke();
+                    break;
+                    
+                case 'shower':
+                    // Square with rounded corners
+                    layerCtx.beginPath();
+                    layerCtx.roundRect(stampX, stampY, size.width, size.height, 10);
+                    layerCtx.fill();
+                    layerCtx.stroke();
+                    break;
+                    
+                case 'bed':
+                    // Rectangle
+                    layerCtx.fillRect(stampX, stampY, size.width, size.height);
+                    layerCtx.strokeRect(stampX, stampY, size.width, size.height);
+                    // Pillow area
+                    layerCtx.strokeRect(stampX + 5, stampY + 5, size.width - 10, 15);
+                    break;
+                    
+                case 'sofa':
+                    // Rectangle with arm rests
+                    layerCtx.fillRect(stampX, stampY, size.width, size.height);
+                    layerCtx.strokeRect(stampX, stampY, size.width, size.height);
+                    // Arms
+                    layerCtx.strokeRect(stampX, stampY, 8, size.height);
+                    layerCtx.strokeRect(stampX + size.width - 8, stampY, 8, size.height);
+                    break;
+                    
+                case 'table':
+                    // Circle
+                    layerCtx.beginPath();
+                    layerCtx.arc(x, y, size.width/2, 0, 2 * Math.PI);
+                    layerCtx.fill();
+                    layerCtx.stroke();
+                    break;
+                    
+                case 'fridge':
+                    // Rectangle with door line
+                    layerCtx.fillRect(stampX, stampY, size.width, size.height);
+                    layerCtx.strokeRect(stampX, stamp<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -30,7 +150,9 @@
             display: flex;
             flex-direction: column;
             padding: 10px 5px;
-            gap: 5px;
+            gap: 3px;
+            overflow-y: auto;
+            max-height: 100vh;
         }
 
         .tool-btn {
@@ -228,6 +350,81 @@
             margin-left: 5px;
         }
 
+        .stamp-library {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px;
+            margin-top: 10px;
+        }
+
+        .stamp-item {
+            width: 60px;
+            height: 50px;
+            background: #333;
+            border: 2px solid #555;
+            border-radius: 5px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: #fff;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .stamp-item:hover {
+            background: #444;
+            border-color: #666;
+        }
+
+        .stamp-item.active {
+            background: #0078d4;
+            border-color: #0078d4;
+        }
+
+        .stamp-label {
+            font-size: 8px;
+            margin-top: 2px;
+            text-align: center;
+        }
+
+        .wall-controls {
+            margin-top: 10px;
+        }
+
+        .wall-thickness-control {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+
+        .wall-thickness-btn {
+            padding: 5px 10px;
+            background: #333;
+            border: 1px solid #555;
+            color: #fff;
+            cursor: pointer;
+            border-radius: 3px;
+            font-size: 10px;
+        }
+
+        .wall-thickness-btn.active {
+            background: #0078d4;
+            border-color: #0078d4;
+        }
+
+        .stamp-preview {
+            position: absolute;
+            pointer-events: none;
+            border: 2px dashed #0078d4;
+            background: rgba(0, 120, 212, 0.1);
+            z-index: 20;
+            display: none;
+        }
+
         .history-panel {
             max-height: 200px;
             overflow-y: auto;
@@ -352,6 +549,7 @@
             position: absolute;
             cursor: pointer;
             pointer-events: all;
+            z-index: 100;
         }
 
         .handle.nw { top: -4px; left: -4px; cursor: nw-resize; }
@@ -410,8 +608,23 @@
             <button class="tool-btn" data-tool="rect" title="Rectangle Tool">▭</button>
             <button class="tool-btn" data-tool="circle" title="Circle Tool">○</button>
             <button class="tool-btn" data-tool="line" title="Line Tool">📏</button>
+            <button class="tool-btn" data-tool="wall" title="Wall Tool">🧱</button>
             <button class="tool-btn" data-tool="fill" title="Fill Tool">🪣</button>
             <button class="tool-btn" data-tool="text" title="Text Tool">T</button>
+            
+            <!-- Separator -->
+            <div style="height: 10px; border-bottom: 1px solid #444; margin: 5px 0;"></div>
+            
+            <!-- Fixture Stamps -->
+            <button class="tool-btn" data-tool="stamp" data-stamp="stove" title="Stove">🔥</button>
+            <button class="tool-btn" data-tool="stamp" data-stamp="sink" title="Sink">🚿</button>
+            <button class="tool-btn" data-tool="stamp" data-stamp="toilet" title="Toilet">🚽</button>
+            <button class="tool-btn" data-tool="stamp" data-stamp="shower" title="Shower">🛁</button>
+            <button class="tool-btn" data-tool="stamp" data-stamp="bed" title="Bed">🛏️</button>
+            <button class="tool-btn" data-tool="stamp" data-stamp="sofa" title="Sofa">🛋️</button>
+            <button class="tool-btn" data-tool="stamp" data-stamp="table" title="Table">🪑</button>
+            <button class="tool-btn" data-tool="stamp" data-stamp="fridge" title="Fridge">❄️</button>
+            <button class="tool-btn" data-tool="stamp" data-stamp="door" title="Door">🚪</button>
         </div>
 
         <div class="main-area">
@@ -430,6 +643,7 @@
                 <div class="canvas-wrapper">
                     <canvas id="canvas" width="800" height="600"></canvas>
                     <div class="selection-box" id="selectionBox"></div>
+                    <div class="stamp-preview" id="stampPreview"></div>
                     <div class="transform-handles" id="transformHandles">
                         <div class="handle nw"></div>
                         <div class="handle n"></div>
@@ -481,6 +695,14 @@
                         <input type="range" class="property-input" id="opacity" min="0" max="100" value="100">
                         <span class="property-value" id="opacityValue">100%</span>
                     </div>
+                    <div class="property-group" id="wallControls" style="display: none;">
+                        <label class="property-label">Wall Thickness</label>
+                        <div class="wall-thickness-control">
+                            <button class="wall-thickness-btn active" data-thickness="4">Thin</button>
+                            <button class="wall-thickness-btn" data-thickness="8">Medium</button>
+                            <button class="wall-thickness-btn" data-thickness="12">Thick</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -511,6 +733,11 @@
         let currentBrushType = 'round';
         let shiftPressed = false;
         let lastX, lastY;
+        let currentStamp = 'stove';
+        let wallThickness = 4;
+        let isResizing = false;
+        let resizeHandle = null;
+        let originalSelection = null;
 
         // Initialize editor
         function init() {
@@ -539,9 +766,32 @@
                         }
                         e.target.classList.add('active');
                         currentTool = e.target.dataset.tool;
+                        
+                        // Set stamp type if it's a stamp tool
+                        if (currentTool === 'stamp' && e.target.dataset.stamp) {
+                            currentStamp = e.target.dataset.stamp;
+                        }
+                        
                         canvas.style.cursor = getCursor(currentTool);
+                        
+                        // Show/hide relevant controls
+                        updateToolControls();
+                        
                     } catch (error) {
                         console.error('Tool selection error:', error);
+                    }
+                });
+            });
+
+            // Wall thickness selection
+            document.querySelectorAll('.wall-thickness-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    try {
+                        document.querySelector('.wall-thickness-btn.active').classList.remove('active');
+                        e.target.classList.add('active');
+                        wallThickness = parseInt(e.target.dataset.thickness);
+                    } catch (error) {
+                        console.error('Wall thickness selection error:', error);
                     }
                 });
             });
@@ -591,14 +841,30 @@
             }, 100);
 
             // Canvas events
-            canvas.addEventListener('mousedown', handleMouseDown);
-            canvas.addEventListener('mousemove', handleMouseMove);
-            canvas.addEventListener('mouseup', handleMouseUp);
+            canvas.addEventListener('mousedown', handleCanvasMouseDown);
+            document.addEventListener('mousemove', handleDocumentMouseMove);
+            document.addEventListener('mouseup', handleDocumentMouseUp);
             canvas.addEventListener('wheel', handleWheel);
+
+            // Add handle event listeners after DOM is ready
+            setTimeout(() => {
+                addHandleListeners();
+            }, 200);
 
             // Keyboard shortcuts
             document.addEventListener('keydown', handleKeyDown);
             document.addEventListener('keyup', handleKeyUp);
+        }
+
+        function addHandleListeners() {
+            document.querySelectorAll('.handle').forEach(handle => {
+                handle.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('Handle mousedown:', e.target.classList[1]);
+                    startResize(e);
+                });
+            });
         }
 
         function getCursor(tool) {
@@ -610,6 +876,8 @@
                 rect: 'crosshair',
                 circle: 'crosshair',
                 line: 'crosshair',
+                wall: 'crosshair',
+                stamp: 'copy',
                 fill: 'crosshair',
                 text: 'text'
             };
@@ -629,13 +897,24 @@
         // Global variables to track layer state
         let layerSnapshots = new Map(); // Store snapshots when starting to draw
 
-        function handleMouseDown(e) {
+        function handleCanvasMouseDown(e) {
             const pos = getMousePos(e);
             startX = pos.x;
             startY = pos.y;
             lastX = startX;
             lastY = startY;
             isDrawing = true;
+
+            // Check if clicking inside existing selection for moving
+            if (selection && currentTool === 'select') {
+                if (pos.x >= selection.x && pos.x <= selection.x + selection.width &&
+                    pos.y >= selection.y && pos.y <= selection.y + selection.height) {
+                    transforming = true;
+                    originalSelection = { ...selection };
+                    console.log('Starting move transform');
+                    return;
+                }
+            }
 
             if (currentTool === 'brush' || currentTool === 'eraser') {
                 const layerCtx = getCurrentLayerContext();
@@ -664,44 +943,86 @@
                 isDrawing = false;
                 redrawCanvas();
                 saveState('Fill');
+            } else if (currentTool === 'stamp') {
+                placeStamp(startX, startY);
+                isDrawing = false;
+                redrawCanvas();
+                saveState('Stamp ' + currentStamp);
+            } else if (currentTool === 'wall') {
+                // Wall drawing will be handled in mouse move/up
             }
         }
 
-        function handleMouseMove(e) {
-            const pos = getMousePos(e);
-            const currentX = pos.x;
-            const currentY = pos.y;
+        function handleDocumentMouseMove(e) {
+            if (isResizing) {
+                doResize(e);
+                return;
+            }
 
-            if (isDrawing && (currentTool === 'brush' || currentTool === 'eraser')) {
-                const layerCtx = getCurrentLayerContext();
-                if (layerCtx && layerSnapshots.has(currentLayer)) {
-                    if (shiftPressed) {
-                        // For straight lines, restore from snapshot and draw line
-                        const snapshot = layerSnapshots.get(currentLayer);
-                        layerCtx.clearRect(0, 0, layers[currentLayer].canvas.width, layers[currentLayer].canvas.height);
-                        layerCtx.drawImage(snapshot, 0, 0);
-                        
-                        // Draw the straight line
-                        setupBrush();
-                        layerCtx.beginPath();
-                        const lineStartX = lastX !== undefined ? lastX : startX;
-                        const lineStartY = lastY !== undefined ? lastY : startY;
-                        layerCtx.moveTo(lineStartX, lineStartY);
-                        layerCtx.lineTo(currentX, currentY);
-                        layerCtx.stroke();
-                    } else {
-                        // Normal brush behavior
-                        layerCtx.lineTo(currentX, currentY);
-                        layerCtx.stroke();
-                    }
-                    redrawCanvas();
+            // Only handle canvas-related moves if mouse is over canvas
+            if (e.target === canvas) {
+                const pos = getMousePos(e);
+                const currentX = pos.x;
+                const currentY = pos.y;
+
+                // Handle moving selection
+                if (transforming && selection) {
+                    const deltaX = currentX - startX;
+                    const deltaY = currentY - startY;
+                    selection.x = Math.max(0, originalSelection.x + deltaX);
+                    selection.y = Math.max(0, originalSelection.y + deltaY);
+                    updateSelectionDisplay();
+                    return;
                 }
-            } else if (isDrawing && currentTool === 'select') {
-                updateSelection(startX, startY, currentX, currentY);
+
+                if (isDrawing && (currentTool === 'brush' || currentTool === 'eraser')) {
+                    const layerCtx = getCurrentLayerContext();
+                    if (layerCtx && layerSnapshots.has(currentLayer)) {
+                        if (shiftPressed) {
+                            // For straight lines, restore from snapshot and draw line
+                            const snapshot = layerSnapshots.get(currentLayer);
+                            layerCtx.clearRect(0, 0, layers[currentLayer].canvas.width, layers[currentLayer].canvas.height);
+                            layerCtx.drawImage(snapshot, 0, 0);
+                            
+                            // Draw the straight line
+                            setupBrush();
+                            layerCtx.beginPath();
+                            const lineStartX = lastX !== undefined ? lastX : startX;
+                            const lineStartY = lastY !== undefined ? lastY : startY;
+                            layerCtx.moveTo(lineStartX, lineStartY);
+                            layerCtx.lineTo(currentX, currentY);
+                            layerCtx.stroke();
+                        } else {
+                            // Normal brush behavior
+                            layerCtx.lineTo(currentX, currentY);
+                            layerCtx.stroke();
+                        }
+                        redrawCanvas();
+                    }
+                } else if (isDrawing && currentTool === 'select') {
+                    updateSelection(startX, startY, currentX, currentY);
+                }
             }
         }
 
-        function handleMouseUp(e) {
+        function handleDocumentMouseUp(e) {
+            if (isResizing) {
+                isResizing = false;
+                resizeHandle = null;
+                originalSelection = null;
+                console.log('Resize ended');
+                saveState('Resize');
+                return;
+            }
+
+            if (transforming) {
+                transforming = false;
+                originalSelection = null;
+                console.log('Move ended');
+                saveState('Move');
+                return;
+            }
+
             if (!isDrawing) return;
             isDrawing = false;
 
@@ -731,9 +1052,362 @@
                 drawLine(startX, startY, endX, endY);
                 redrawCanvas();
                 saveState('Line');
+            } else if (currentTool === 'wall') {
+                drawWall(startX, startY, endX, endY);
+                redrawCanvas();
+                saveState('Wall');
             } else if (currentTool === 'select') {
                 finalizeSelection();
             }
+        }
+
+        function startResize(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            if (!selection) return;
+            
+            isResizing = true;
+            resizeHandle = e.target.classList[1]; // Gets 'nw', 'n', 'ne', etc.
+            originalSelection = { ...selection };
+            
+            console.log('Starting resize with handle:', resizeHandle);
+            
+            // Get mouse position
+            const rect = canvas.getBoundingClientRect();
+            startX = (e.clientX - rect.left) / zoom;
+            startY = (e.clientY - rect.top) / zoom;
+        }
+
+        function doResize(e) {
+            if (!selection || !originalSelection || !resizeHandle) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const currentX = (e.clientX - rect.left) / zoom;
+            const currentY = (e.clientY - rect.top) / zoom;
+            
+            const deltaX = currentX - startX;
+            const deltaY = currentY - startY;
+            
+            // Calculate new selection bounds based on handle
+            let newX = originalSelection.x;
+            let newY = originalSelection.y;
+            let newWidth = originalSelection.width;
+            let newHeight = originalSelection.height;
+            
+            switch (resizeHandle) {
+                case 'nw':
+                    newX = originalSelection.x + deltaX;
+                    newY = originalSelection.y + deltaY;
+                    newWidth = originalSelection.width - deltaX;
+                    newHeight = originalSelection.height - deltaY;
+                    break;
+                case 'n':
+                    newY = originalSelection.y + deltaY;
+                    newHeight = originalSelection.height - deltaY;
+                    break;
+                case 'ne':
+                    newY = originalSelection.y + deltaY;
+                    newWidth = originalSelection.width + deltaX;
+                    newHeight = originalSelection.height - deltaY;
+                    break;
+                case 'e':
+                    newWidth = originalSelection.width + deltaX;
+                    break;
+                case 'se':
+                    newWidth = originalSelection.width + deltaX;
+                    newHeight = originalSelection.height + deltaY;
+                    break;
+                case 's':
+                    newHeight = originalSelection.height + deltaY;
+                    break;
+                case 'sw':
+                    newX = originalSelection.x + deltaX;
+                    newWidth = originalSelection.width - deltaX;
+                    newHeight = originalSelection.height + deltaY;
+                    break;
+                case 'w':
+                    newX = originalSelection.x + deltaX;
+                    newWidth = originalSelection.width - deltaX;
+                    break;
+            }
+            
+            // Ensure minimum size
+            if (newWidth < 10) {
+                newWidth = 10;
+                if (resizeHandle.includes('w')) {
+                    newX = originalSelection.x + originalSelection.width - 10;
+                }
+            }
+            if (newHeight < 10) {
+                newHeight = 10;
+                if (resizeHandle.includes('n')) {
+                    newY = originalSelection.y + originalSelection.height - 10;
+                }
+            }
+            
+            // Update selection
+            selection.x = Math.max(0, newX);
+            selection.y = Math.max(0, newY);
+            selection.width = newWidth;
+            selection.height = newHeight;
+            
+            // Redraw the fixture at the new size
+            redrawFixtureAtSelection();
+            
+            updateSelectionDisplay();
+        }
+
+        function redrawFixtureAtSelection() {
+            if (!selection || !currentStamp) return;
+            
+            // Clear the area where the fixture was
+            const layerCtx = getCurrentLayerContext();
+            if (!layerCtx) return;
+            
+            // Clear the entire layer (we'll redraw the fixture at new size)
+            layerCtx.clearRect(0, 0, layerCtx.canvas.width, layerCtx.canvas.height);
+            
+            // Redraw the fixture at the selection bounds
+            drawFixtureAtBounds(layerCtx, selection.x, selection.y, selection.width, selection.height, currentStamp);
+            
+            // Update main canvas
+            redrawCanvas();
+        }
+
+        function drawFixtureAtBounds(layerCtx, x, y, width, height, stampType) {
+            const opacity = document.getElementById('opacity') ? 
+                (parseInt(document.getElementById('opacity').value) || 100) / 100 : 1;
+            
+            layerCtx.globalAlpha = opacity;
+            layerCtx.strokeStyle = '#000000';
+            layerCtx.fillStyle = '#f0f0f0';
+            layerCtx.lineWidth = 2;
+            
+            const centerX = x + width / 2;
+            const centerY = y + height / 2;
+            
+            // Draw based on stamp type with new bounds
+            switch (stampType) {
+                case 'stove':
+                    // Square with circles for burners
+                    layerCtx.fillRect(x, y, width, height);
+                    layerCtx.strokeRect(x, y, width, height);
+                    // Burners - scale with size
+                    layerCtx.strokeStyle = '#666';
+                    const burnerSize = Math.min(width, height) * 0.15;
+                    for (let i = 0; i < 2; i++) {
+                        for (let j = 0; j < 2; j++) {
+                            layerCtx.beginPath();
+                            layerCtx.arc(x + width * 0.25 + i * width * 0.5, 
+                                       y + height * 0.25 + j * height * 0.5, 
+                                       burnerSize, 0, 2 * Math.PI);
+                            layerCtx.stroke();
+                        }
+                    }
+                    break;
+                    
+                case 'sink':
+                    // Kitchen sink with realistic design
+                    layerCtx.strokeStyle = '#000000';
+                    layerCtx.lineWidth = 2;
+                    layerCtx.fillStyle = '#e8e8e8';
+                    
+                    // Main counter/sink unit
+                    layerCtx.fillRect(x, y, width, height);
+                    layerCtx.strokeRect(x, y, width, height);
+                    
+                    // Sink basin (main bowl)
+                    layerCtx.fillStyle = '#d0d0d0';
+                    layerCtx.beginPath();
+                    layerCtx.roundRect(x + width * 0.15, y + height * 0.2, 
+                                     width * 0.7, height * 0.6, width * 0.05);
+                    layerCtx.fill();
+                    layerCtx.stroke();
+                    
+                    // Faucet base
+                    layerCtx.fillStyle = '#888';
+                    layerCtx.beginPath();
+                    layerCtx.arc(centerX, y + height * 0.1, width * 0.06, 0, 2 * Math.PI);
+                    layerCtx.fill();
+                    layerCtx.stroke();
+                    
+                    // Faucet spout
+                    layerCtx.lineWidth = 3;
+                    layerCtx.strokeStyle = '#666';
+                    layerCtx.beginPath();
+                    layerCtx.moveTo(centerX, y + height * 0.1);
+                    layerCtx.lineTo(centerX, y + height * 0.4);
+                    layerCtx.stroke();
+                    
+                    // Drain
+                    layerCtx.fillStyle = '#999';
+                    layerCtx.beginPath();
+                    layerCtx.arc(centerX, centerY, width * 0.04, 0, 2 * Math.PI);
+                    layerCtx.fill();
+                    break;
+                    
+                case 'toilet':
+                    // Rectangle for tank + oval for bowl
+                    layerCtx.fillRect(x + width * 0.15, y, width * 0.7, height * 0.4);
+                    layerCtx.strokeRect(x + width * 0.15, y, width * 0.7, height * 0.4);
+                    layerCtx.beginPath();
+                    layerCtx.ellipse(centerX, y + height * 0.7, width * 0.35, height * 0.25, 0, 0, 2 * Math.PI);
+                    layerCtx.fill();
+                    layerCtx.stroke();
+                    break;
+                    
+                case 'shower':
+                    // Simple square shower with center shower head
+                    layerCtx.strokeStyle = '#000000';
+                    layerCtx.lineWidth = 2;
+                    layerCtx.fillStyle = '#f8f8f8';
+                    
+                    // Shower floor/base
+                    layerCtx.fillRect(x, y, width, height);
+                    layerCtx.strokeRect(x, y, width, height);
+                    
+                    // Shower head in center top
+                    layerCtx.fillStyle = '#666';
+                    layerCtx.strokeStyle = '#333';
+                    layerCtx.lineWidth = 1;
+                    layerCtx.beginPath();
+                    layerCtx.arc(centerX, y + height * 0.15, width * 0.08, 0, 2 * Math.PI);
+                    layerCtx.fill();
+                    layerCtx.stroke();
+                    
+                    // Shower head holes
+                    layerCtx.fillStyle = '#333';
+                    for (let i = 0; i < 3; i++) {
+                        for (let j = 0; j < 3; j++) {
+                            layerCtx.beginPath();
+                            layerCtx.arc(centerX - width * 0.03 + i * width * 0.03, 
+                                       y + height * 0.12 + j * width * 0.02, 
+                                       1, 0, 2 * Math.PI);
+                            layerCtx.fill();
+                        }
+                    }
+                    
+                    // Water drops coming down
+                    layerCtx.fillStyle = '#4da6ff';
+                    for (let i = 0; i < 8; i++) {
+                        layerCtx.beginPath();
+                        layerCtx.arc(centerX - width * 0.1 + (i * width * 0.025), 
+                                   y + height * 0.3 + (i % 3) * height * 0.1, 
+                                   Math.max(1, width * 0.01), 0, 2 * Math.PI);
+                        layerCtx.fill();
+                    }
+                    
+                    // Floor drain in center bottom
+                    layerCtx.fillStyle = '#333';
+                    layerCtx.strokeStyle = '#000';
+                    layerCtx.lineWidth = 1;
+                    layerCtx.beginPath();
+                    layerCtx.arc(centerX, y + height * 0.85, width * 0.06, 0, 2 * Math.PI);
+                    layerCtx.fill();
+                    layerCtx.stroke();
+                    
+                    // Drain lines
+                    layerCtx.strokeStyle = '#666';
+                    for (let i = 0; i < 6; i++) {
+                        const angle = (i * Math.PI) / 3;
+                        layerCtx.beginPath();
+                        layerCtx.moveTo(centerX + Math.cos(angle) * width * 0.03, 
+                                      y + height * 0.85 + Math.sin(angle) * width * 0.03);
+                        layerCtx.lineTo(centerX + Math.cos(angle) * width * 0.05, 
+                                      y + height * 0.85 + Math.sin(angle) * width * 0.05);
+                        layerCtx.stroke();
+                    }
+                    break;
+                    
+                case 'bed':
+                    // Rectangle
+                    layerCtx.fillRect(x, y, width, height);
+                    layerCtx.strokeRect(x, y, width, height);
+                    // Pillow area
+                    layerCtx.strokeRect(x + width * 0.05, y + height * 0.05, width * 0.9, height * 0.25);
+                    break;
+                    
+                case 'sofa':
+                    // Rectangle with arm rests
+                    layerCtx.fillRect(x, y, width, height);
+                    layerCtx.strokeRect(x, y, width, height);
+                    // Arms
+                    layerCtx.strokeRect(x, y, width * 0.15, height);
+                    layerCtx.strokeRect(x + width * 0.85, y, width * 0.15, height);
+                    break;
+                    
+                case 'table':
+                    // Circle
+                    layerCtx.beginPath();
+                    layerCtx.arc(centerX, centerY, Math.min(width, height) / 2, 0, 2 * Math.PI);
+                    layerCtx.fill();
+                    layerCtx.stroke();
+                    break;
+                    
+                case 'fridge':
+                    // Modern refrigerator design
+                    layerCtx.fillStyle = '#f0f0f0';
+                    layerCtx.strokeStyle = '#000';
+                    layerCtx.lineWidth = 2;
+                    
+                    // Main body
+                    layerCtx.fillRect(x, y, width, height);
+                    layerCtx.strokeRect(x, y, width, height);
+                    
+                    // Freezer section (top)
+                    layerCtx.strokeRect(x + width * 0.05, y + height * 0.05, 
+                                      width * 0.9, height * 0.35);
+                    
+                    // Main fridge section (bottom)
+                    layerCtx.strokeRect(x + width * 0.05, y + height * 0.45, 
+                                      width * 0.9, height * 0.5);
+                    
+                    // Door handles
+                    layerCtx.fillStyle = '#666';
+                    layerCtx.fillRect(x + width * 0.85, y + height * 0.15, 
+                                    width * 0.03, height * 0.1);
+                    layerCtx.fillRect(x + width * 0.85, y + height * 0.55, 
+                                    width * 0.03, height * 0.15);
+                    
+                    // Brand logo area
+                    layerCtx.strokeStyle = '#ccc';
+                    layerCtx.lineWidth = 1;
+                    layerCtx.strokeRect(x + width * 0.2, y + height * 0.7, 
+                                      width * 0.6, height * 0.1);
+                    break;
+                    
+                case 'door':
+                    // Arc showing door swing
+                    layerCtx.strokeStyle = '#000000';
+                    layerCtx.lineWidth = 3;
+                    layerCtx.beginPath();
+                    layerCtx.arc(x, centerY, Math.min(width, height * 2), 0, Math.PI/2);
+                    layerCtx.stroke();
+                    // Door frame
+                    layerCtx.strokeRect(x, y, width, height);
+                    break;
+                    
+                default:
+                    // Default rectangle
+                    layerCtx.fillRect(x, y, width, height);
+                    layerCtx.strokeRect(x, y, width, height);
+            }
+            
+            layerCtx.globalAlpha = 1;
+        }
+
+        function updateSelectionDisplay() {
+            // Update selection box visual
+            const selectionBox = document.getElementById('selectionBox');
+            selectionBox.style.left = (selection.x * zoom) + 'px';
+            selectionBox.style.top = (selection.y * zoom) + 'px';
+            selectionBox.style.width = (selection.width * zoom) + 'px';
+            selectionBox.style.height = (selection.height * zoom) + 'px';
+            selectionBox.style.display = 'block';
+            
+            // Update transform handles
+            showTransformHandles();
         }
 
         function handleWheel(e) {
@@ -996,6 +1670,11 @@
             handles.style.top = (selection.y * zoom) + 'px';
             handles.style.width = (selection.width * zoom) + 'px';
             handles.style.height = (selection.height * zoom) + 'px';
+            
+            // Re-add event listeners to handles
+            setTimeout(() => {
+                addHandleListeners();
+            }, 10);
         }
 
         function hideSelection() {
@@ -1753,8 +2432,483 @@
             }
         }
 
-        // Enhanced brush preview (optional - shows brush size when hovering)
-        let brushPreview = null;
+        // Temporarily disabled brush preview to fix errors
+        function showBrushPreview(e) {
+            // Disabled for now
+            return;
+        }
+
+        function hideBrushPreview() {
+            // Disabled for now
+            return;
+        }
+
+        // Tool control visibility
+        function updateToolControls() {
+            const stampControls = document.getElementById('stampControls');
+            const wallControls = document.getElementById('wallControls');
+            
+            if (stampControls) {
+                stampControls.style.display = currentTool === 'stamp' ? 'block' : 'none';
+            }
+            if (wallControls) {
+                wallControls.style.display = currentTool === 'wall' ? 'block' : 'none';
+            }
+        }
+
+        // Wall drawing functionality
+        function drawWall(x1, y1, x2, y2) {
+            const layerCtx = getCurrentLayerContext();
+            if (!layerCtx) return;
+            
+            const color = document.getElementById('brushColor') ? 
+                document.getElementById('brushColor').value : '#000000';
+            
+            layerCtx.strokeStyle = color;
+            layerCtx.lineWidth = wallThickness;
+            layerCtx.lineCap = 'butt';
+            layerCtx.beginPath();
+            layerCtx.moveTo(x1, y1);
+            layerCtx.lineTo(x2, y2);
+            layerCtx.stroke();
+        }
+
+        // Stamp functionality - with automatic new layer
+        function placeStamp(x, y) {
+            // Create a new layer for this stamp
+            const layerCanvas = document.createElement('canvas');
+            layerCanvas.width = canvas.width;
+            layerCanvas.height = canvas.height;
+            
+            const layer = {
+                id: Date.now(),
+                name: `${currentStamp.charAt(0).toUpperCase() + currentStamp.slice(1)}`,
+                canvas: layerCanvas,
+                visible: true,
+                opacity: 1
+            };
+            
+            layers.push(layer);
+            currentLayer = layers.length - 1;
+            updateLayersList();
+            
+            const layerCtx = getCurrentLayerContext();
+            if (!layerCtx) return;
+            
+            const stampSizes = {
+                stove: { width: 60, height: 60 },
+                sink: { width: 60, height: 40 },
+                toilet: { width: 30, height: 50 },
+                shower: { width: 80, height: 80 },
+                bed: { width: 100, height: 60 },
+                sofa: { width: 80, height: 40 },
+                table: { width: 60, height: 60 },
+                fridge: { width: 50, height: 30 },
+                door: { width: 60, height: 8 }
+            };
+            
+            const size = stampSizes[currentStamp] || { width: 50, height: 50 };
+            
+            const stampX = x - size.width / 2;
+            const stampY = y - size.height / 2;
+            
+            // Draw the improved fixtures
+            drawImprovedFixture(layerCtx, stampX, stampY, size.width, size.height, currentStamp);
+            
+            // Automatically create selection for the stamped item
+            selection = {
+                x: stampX,
+                y: stampY,
+                width: size.width,
+                height: size.height
+            };
+            
+            // Show transform handles
+            showTransformHandles();
+            
+            // Switch to select tool for immediate transformation
+            switchToTool('select');
+        }
+
+        function drawImprovedFixture(layerCtx, x, y, width, height, stampType) {
+            const opacity = document.getElementById('opacity') ? 
+                (parseInt(document.getElementById('opacity').value) || 100) / 100 : 1;
+            
+            layerCtx.globalAlpha = opacity;
+            layerCtx.strokeStyle = '#000000';
+            layerCtx.fillStyle = '#f0f0f0';
+            layerCtx.lineWidth = 2;
+            
+            const centerX = x + width / 2;
+            const centerY = y + height / 2;
+            
+            // Draw based on stamp type
+            switch (stampType) {
+                case 'stove':
+                    // Square with circles for burners
+                    layerCtx.fillRect(x, y, width, height);
+                    layerCtx.strokeRect(x, y, width, height);
+                    // Burners - scale with size
+                    layerCtx.strokeStyle = '#666';
+                    const burnerSize = Math.min(width, height) * 0.15;
+                    for (let i = 0; i < 2; i++) {
+                        for (let j = 0; j < 2; j++) {
+                            layerCtx.beginPath();
+                            layerCtx.arc(x + width * 0.25 + i * width * 0.5, 
+                                       y + height * 0.25 + j * height * 0.5, 
+                                       burnerSize, 0, 2 * Math.PI);
+                            layerCtx.stroke();
+                        }
+                    }
+                    break;
+                    
+                case 'sink':
+                    // Kitchen sink with realistic design
+                    layerCtx.strokeStyle = '#000000';
+                    layerCtx.lineWidth = 2;
+                    layerCtx.fillStyle = '#e8e8e8';
+                    
+                    // Main counter/sink unit
+                    layerCtx.fillRect(x, y, width, height);
+                    layerCtx.strokeRect(x, y, width, height);
+                    
+                    // Sink basin (main bowl)
+                    layerCtx.fillStyle = '#d0d0d0';
+                    layerCtx.fillRect(x + width * 0.15, y + height * 0.2, width * 0.7, height * 0.6);
+                    layerCtx.strokeRect(x + width * 0.15, y + height * 0.2, width * 0.7, height * 0.6);
+                    
+                    // Faucet base
+                    layerCtx.fillStyle = '#888';
+                    layerCtx.beginPath();
+                    layerCtx.arc(centerX, y + height * 0.1, width * 0.06, 0, 2 * Math.PI);
+                    layerCtx.fill();
+                    layerCtx.stroke();
+                    
+                    // Faucet spout
+                    layerCtx.lineWidth = 3;
+                    layerCtx.strokeStyle = '#666';
+                    layerCtx.beginPath();
+                    layerCtx.moveTo(centerX, y + height * 0.1);
+                    layerCtx.lineTo(centerX, y + height * 0.4);
+                    layerCtx.stroke();
+                    
+                    // Drain
+                    layerCtx.fillStyle = '#999';
+                    layerCtx.beginPath();
+                    layerCtx.arc(centerX, centerY, width * 0.04, 0, 2 * Math.PI);
+                    layerCtx.fill();
+                    break;
+                    
+                case 'shower':
+                    // Modern shower enclosure
+                    layerCtx.strokeStyle = '#000000';
+                    layerCtx.lineWidth = 3;
+                    layerCtx.fillStyle = '#f8f8f8';
+                    
+                    // Shower base/floor
+                    layerCtx.fillRect(x, y, width, height);
+                    layerCtx.strokeRect(x, y, width, height);
+                    
+                    // Glass walls (three sides)
+                    layerCtx.strokeStyle = '#4da6ff';
+                    layerCtx.lineWidth = 2;
+                    layerCtx.beginPath();
+                    layerCtx.moveTo(x, y);
+                    layerCtx.lineTo(x, y + height);
+                    layerCtx.lineTo(x + width, y + height);
+                    layerCtx.lineTo(x + width, y);
+                    layerCtx.stroke();
+                    
+                    // Shower door (glass effect)
+                    layerCtx.setLineDash([8, 4]);
+                    layerCtx.strokeStyle = '#4da6ff';
+                    layerCtx.beginPath();
+                    layerCtx.moveTo(x + width * 0.2, y);
+                    layerCtx.lineTo(x + width * 0.8, y);
+                    layerCtx.stroke();
+                    layerCtx.setLineDash([]);
+                    
+                    // Shower head
+                    layerCtx.fillStyle = '#666';
+                    layerCtx.strokeStyle = '#000';
+                    layerCtx.lineWidth = 1;
+                    layerCtx.beginPath();
+                    layerCtx.arc(x + width * 0.2, y + height * 0.15, width * 0.06, 0, 2 * Math.PI);
+                    layerCtx.fill();
+                    layerCtx.stroke();
+                    
+                    // Water spray pattern
+                    layerCtx.fillStyle = '#4da6ff';
+                    const dropCount = Math.floor(width / 8);
+                    for (let i = 0; i < dropCount; i++) {
+                        for (let j = 0; j < 3; j++) {
+                            layerCtx.beginPath();
+                            layerCtx.arc(x + width * 0.1 + (i % 4) * width * 0.05, 
+                                       y + height * 0.25 + j * height * 0.1, 
+                                       Math.max(1, width * 0.01), 0, 2 * Math.PI);
+                            layerCtx.fill();
+                        }
+                    }
+                    
+                    // Floor drain
+                    layerCtx.fillStyle = '#333';
+                    layerCtx.strokeStyle = '#000';
+                    layerCtx.lineWidth = 1;
+                    layerCtx.beginPath();
+                    layerCtx.arc(centerX, y + height * 0.8, width * 0.05, 0, 2 * Math.PI);
+                    layerCtx.fill();
+                    layerCtx.stroke();
+                    break;
+                    
+                case 'fridge':
+                    // Modern refrigerator design
+                    layerCtx.fillStyle = '#f0f0f0';
+                    layerCtx.strokeStyle = '#000';
+                    layerCtx.lineWidth = 2;
+                    
+                    // Main body
+                    layerCtx.fillRect(x, y, width, height);
+                    layerCtx.strokeRect(x, y, width, height);
+                    
+                    // Freezer section (top)
+                    layerCtx.strokeRect(x + width * 0.05, y + height * 0.05, 
+                                      width * 0.9, height * 0.35);
+                    
+                    // Main fridge section (bottom)
+                    layerCtx.strokeRect(x + width * 0.05, y + height * 0.45, 
+                                      width * 0.9, height * 0.5);
+                    
+                    // Door handles
+                    layerCtx.fillStyle = '#666';
+                    layerCtx.fillRect(x + width * 0.85, y + height * 0.15, 
+                                    width * 0.03, height * 0.1);
+                    layerCtx.fillRect(x + width * 0.85, y + height * 0.55, 
+                                    width * 0.03, height * 0.15);
+                    
+                    // Brand logo area
+                    layerCtx.strokeStyle = '#ccc';
+                    layerCtx.lineWidth = 1;
+                    layerCtx.strokeRect(x + width * 0.2, y + height * 0.7, 
+                                      width * 0.6, height * 0.1);
+                    break;
+
+                case 'toilet':
+                    // Rectangle for tank + oval for bowl
+                    layerCtx.fillRect(x + width * 0.15, y, width * 0.7, height * 0.4);
+                    layerCtx.strokeRect(x + width * 0.15, y, width * 0.7, height * 0.4);
+                    layerCtx.beginPath();
+                    layerCtx.ellipse(centerX, y + height * 0.7, width * 0.35, height * 0.25, 0, 0, 2 * Math.PI);
+                    layerCtx.fill();
+                    layerCtx.stroke();
+                    break;
+
+                case 'bed':
+                    // Rectangle
+                    layerCtx.fillRect(x, y, width, height);
+                    layerCtx.strokeRect(x, y, width, height);
+                    // Pillow area
+                    layerCtx.strokeRect(x + width * 0.05, y + height * 0.05, width * 0.9, height * 0.25);
+                    break;
+
+                case 'sofa':
+                    // Rectangle with arm rests
+                    layerCtx.fillRect(x, y, width, height);
+                    layerCtx.strokeRect(x, y, width, height);
+                    // Arms
+                    layerCtx.strokeRect(x, y, width * 0.15, height);
+                    layerCtx.strokeRect(x + width * 0.85, y, width * 0.15, height);
+                    break;
+
+                case 'table':
+                    // Circle
+                    layerCtx.beginPath();
+                    layerCtx.arc(centerX, centerY, Math.min(width, height) / 2, 0, 2 * Math.PI);
+                    layerCtx.fill();
+                    layerCtx.stroke();
+                    break;
+
+                case 'door':
+                    // Arc showing door swing
+                    layerCtx.strokeStyle = '#000000';
+                    layerCtx.lineWidth = 3;
+                    layerCtx.beginPath();
+                    layerCtx.arc(x, centerY, Math.min(width, height * 2), 0, Math.PI/2);
+                    layerCtx.stroke();
+                    // Door frame
+                    layerCtx.strokeRect(x, y, width, height);
+                    break;
+
+                default:
+                    // Default rectangle
+                    layerCtx.fillRect(x, y, width, height);
+                    layerCtx.strokeRect(x, y, width, height);
+            }
+            
+            layerCtx.globalAlpha = 1;
+        }
+
+        // Transform handle functionality
+        function handleResizeStart(e) {
+            console.log('Resize start triggered'); // Debug log
+            e.preventDefault();
+            e.stopPropagation();
+            
+            if (!selection) {
+                console.log('No selection found');
+                return;
+            }
+            
+            isResizing = true;
+            resizeHandle = e.target.classList[1]; // Gets 'nw', 'n', 'ne', etc.
+            originalSelection = { ...selection };
+            
+            console.log('Resize handle:', resizeHandle); // Debug log
+            
+            // Get mouse position relative to canvas
+            const rect = canvas.getBoundingClientRect();
+            startX = (e.clientX - rect.left) / zoom;
+            startY = (e.clientY - rect.top) / zoom;
+            
+            // Add global mouse events for smooth dragging
+            document.addEventListener('mousemove', handleResizeMove);
+            document.addEventListener('mouseup', handleResizeEnd);
+        }
+
+        function handleResizeMove(e) {
+            if (!isResizing || !selection || !originalSelection) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const currentX = (e.clientX - rect.left) / zoom;
+            const currentY = (e.clientY - rect.top) / zoom;
+            
+            updateSelectionSize(currentX, currentY);
+        }
+
+        function handleResizeEnd(e) {
+            console.log('Resize end triggered'); // Debug log
+            if (isResizing) {
+                isResizing = false;
+                resizeHandle = null;
+                originalSelection = null;
+                saveState('Resize');
+            }
+            
+            // Remove global mouse events
+            document.removeEventListener('mousemove', handleResizeMove);
+            document.removeEventListener('mouseup', handleResizeEnd);
+        }
+
+        function updateSelectionSize(currentX, currentY) {
+            if (!selection || !originalSelection || !resizeHandle) return;
+            
+            const deltaX = currentX - startX;
+            const deltaY = currentY - startY;
+            
+            // Calculate new selection bounds based on handle
+            let newX = originalSelection.x;
+            let newY = originalSelection.y;
+            let newWidth = originalSelection.width;
+            let newHeight = originalSelection.height;
+            
+            switch (resizeHandle) {
+                case 'nw':
+                    newX = originalSelection.x + deltaX;
+                    newY = originalSelection.y + deltaY;
+                    newWidth = originalSelection.width - deltaX;
+                    newHeight = originalSelection.height - deltaY;
+                    break;
+                case 'n':
+                    newY = originalSelection.y + deltaY;
+                    newHeight = originalSelection.height - deltaY;
+                    break;
+                case 'ne':
+                    newY = originalSelection.y + deltaY;
+                    newWidth = originalSelection.width + deltaX;
+                    newHeight = originalSelection.height - deltaY;
+                    break;
+                case 'e':
+                    newWidth = originalSelection.width + deltaX;
+                    break;
+                case 'se':
+                    newWidth = originalSelection.width + deltaX;
+                    newHeight = originalSelection.height + deltaY;
+                    break;
+                case 's':
+                    newHeight = originalSelection.height + deltaY;
+                    break;
+                case 'sw':
+                    newX = originalSelection.x + deltaX;
+                    newWidth = originalSelection.width - deltaX;
+                    newHeight = originalSelection.height + deltaY;
+                    break;
+                case 'w':
+                    newX = originalSelection.x + deltaX;
+                    newWidth = originalSelection.width - deltaX;
+                    break;
+            }
+            
+            // Ensure minimum size
+            if (newWidth < 10) {
+                newWidth = 10;
+                if (resizeHandle.includes('w')) {
+                    newX = originalSelection.x + originalSelection.width - 10;
+                }
+            }
+            if (newHeight < 10) {
+                newHeight = 10;
+                if (resizeHandle.includes('n')) {
+                    newY = originalSelection.y + originalSelection.height - 10;
+                }
+            }
+            
+            // Update selection
+            selection.x = Math.max(0, newX);
+            selection.y = Math.max(0, newY);
+            selection.width = newWidth;
+            selection.height = newHeight;
+            
+            // Update selection box visual
+            const selectionBox = document.getElementById('selectionBox');
+            selectionBox.style.left = (selection.x * zoom) + 'px';
+            selectionBox.style.top = (selection.y * zoom) + 'px';
+            selectionBox.style.width = (selection.width * zoom) + 'px';
+            selectionBox.style.height = (selection.height * zoom) + 'px';
+            selectionBox.style.display = 'block';
+            
+            // Update transform handles
+            showTransformHandles();
+        }
+
+        function startSelection(x, y) {
+            // Clear any existing transform mode
+            transforming = false;
+            originalSelection = null;
+            
+            const selectionBox = document.getElementById('selectionBox');
+            
+            selectionBox.style.left = (x * zoom) + 'px';
+            selectionBox.style.top = (y * zoom) + 'px';
+            selectionBox.style.width = '0px';
+            selectionBox.style.height = '0px';
+            selectionBox.style.display = 'block';
+        }
+
+        function finalizeSelection() {
+            const selectionBox = document.getElementById('selectionBox');
+            const rect = selectionBox.getBoundingClientRect();
+            
+            if (rect.width > 5 && rect.height > 5) {
+                selection = {
+                    x: parseInt(selectionBox.style.left) / zoom,
+                    y: parseInt(selectionBox.style.top) / zoom,
+                    width: parseInt(selectionBox.style.width) / zoom,
+                    height: parseInt(selectionBox.style.height) / zoom
+                };
+                showTransformHandles();
+            } else {
+                hideSelection();
+            }
+        }
 
         function showBrushPreview(e) {
             if (currentTool !== 'brush' && currentTool !== 'eraser') return;
