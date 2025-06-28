@@ -327,6 +327,7 @@
                 <button class="btn btn-secondary" onclick="addLayer()">New Layer</button>
                 <button class="btn btn-secondary" onclick="duplicateLayer()">Duplicate</button>
                 <button class="btn btn-secondary" onclick="deleteLayer()">Delete Layer</button>
+                <button class="btn btn-secondary" onclick="clearLayer()">Clear Layer</button>
                 <button class="btn btn-secondary" onclick="undo()">Undo</button>
                 <button class="btn btn-secondary" onclick="redo()">Redo</button>
             </div>
@@ -368,6 +369,13 @@
                     <div class="property-group">
                         <label class="property-label">Brush Size</label>
                         <input type="range" class="property-input" id="brushSize" min="1" max="50" value="5">
+                    </div>
+                    <div class="property-group">
+                        <label class="property-label">Brush Tip</label>
+                        <select class="property-input" id="brushTip">
+                            <option value="round">Round</option>
+                            <option value="square">Square</option>
+                        </select>
                     </div>
                     <div class="property-group">
                         <label class="property-label">Color</label>
@@ -429,6 +437,8 @@
             canvas.addEventListener('mousedown', handleMouseDown);
             canvas.addEventListener('mousemove', handleMouseMove);
             canvas.addEventListener('mouseup', handleMouseUp);
+            canvas.addEventListener('mousemove', showBrushPreview);
+            canvas.addEventListener('mouseleave', hideBrushPreview);
             canvas.addEventListener('wheel', handleWheel);
 
             // Keyboard shortcuts
@@ -638,15 +648,23 @@
             const size = document.getElementById('brushSize').value;
             const color = document.getElementById('brushColor').value;
             const opacity = document.getElementById('opacity').value / 100;
+            const brushTip = document.getElementById('brushTip').value;
             
             // Get the current layer's context
             const layerCtx = getCurrentLayerContext();
             if (!layerCtx) return;
             
             layerCtx.lineWidth = size;
-            layerCtx.lineCap = 'round';
-            layerCtx.lineJoin = 'round';
             layerCtx.globalAlpha = opacity;
+            
+            // Set brush tip shape
+            if (brushTip === 'round') {
+                layerCtx.lineCap = 'round';
+                layerCtx.lineJoin = 'round';
+            } else {
+                layerCtx.lineCap = 'square';
+                layerCtx.lineJoin = 'miter';
+            }
             
             if (currentTool === 'eraser') {
                 layerCtx.globalCompositeOperation = 'destination-out';
@@ -888,21 +906,38 @@
         }
 
         function saveState() {
+            // Remove future history if we're not at the end
             if (historyStep < history.length - 1) {
                 history = history.slice(0, historyStep + 1);
             }
             
+            // Create a deep copy of the current state
             const state = {
-                layers: layers.map(layer => ({
-                    ...layer,
-                    imageData: layer.canvas.toDataURL()
-                })),
-                currentLayer
+                layers: layers.map(layer => {
+                    // Create a temporary canvas to get image data
+                    const tempCanvas = document.createElement('canvas');
+                    tempCanvas.width = layer.canvas.width;
+                    tempCanvas.height = layer.canvas.height;
+                    const tempCtx = tempCanvas.getContext('2d');
+                    tempCtx.drawImage(layer.canvas, 0, 0);
+                    
+                    return {
+                        id: layer.id,
+                        name: layer.name,
+                        visible: layer.visible,
+                        opacity: layer.opacity,
+                        imageData: tempCanvas.toDataURL()
+                    };
+                }),
+                currentLayer: currentLayer,
+                canvasWidth: canvas.width,
+                canvasHeight: canvas.height
             };
             
             history.push(state);
             historyStep++;
             
+            // Limit history size to prevent memory issues
             if (history.length > 50) {
                 history.shift();
                 historyStep--;
@@ -924,27 +959,58 @@
         }
 
         function restoreState(state) {
-            layers = state.layers.map(layerData => {
-                const canvas = document.createElement('canvas');
-                canvas.width = 800;
-                canvas.height = 600;
-                const ctx = canvas.getContext('2d');
+            // Clear current layers
+            layers = [];
+            
+            // Restore canvas size
+            canvas.width = state.canvasWidth;
+            canvas.height = state.canvasHeight;
+            
+            // Restore layers
+            let loadedLayers = 0;
+            const totalLayers = state.layers.length;
+            
+            state.layers.forEach((layerData, index) => {
+                const layerCanvas = document.createElement('canvas');
+                layerCanvas.width = state.canvasWidth;
+                layerCanvas.height = state.canvasHeight;
+                const layerCtx = layerCanvas.getContext('2d');
                 
                 const img = new Image();
                 img.onload = () => {
-                    ctx.drawImage(img, 0, 0);
-                    redrawCanvas();
+                    layerCtx.drawImage(img, 0, 0);
+                    loadedLayers++;
+                    
+                    // When all layers are loaded, redraw the canvas
+                    if (loadedLayers === totalLayers) {
+                        redrawCanvas();
+                    }
                 };
-                img.src = layerData.imageData;
                 
-                return {
-                    ...layerData,
-                    canvas
+                // Set empty image data if none exists
+                img.src = layerData.imageData || 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
+                
+                const layer = {
+                    id: layerData.id,
+                    name: layerData.name,
+                    visible: layerData.visible,
+                    opacity: layerData.opacity,
+                    canvas: layerCanvas
                 };
+                
+                layers.push(layer);
             });
             
-            currentLayer = state.currentLayer;
+            // Restore current layer
+            currentLayer = Math.min(state.currentLayer, layers.length - 1);
+            
+            // Update UI
             updateLayersList();
+            
+            // If no layers were restored, redraw immediately
+            if (totalLayers === 0) {
+                redrawCanvas();
+            }
         }
 
         function updateZoom() {
@@ -1334,6 +1400,51 @@
                     message.remove();
                 }
             }, 2000);
+        }
+
+        // Clear current layer
+        function clearLayer() {
+            const layerCtx = getCurrentLayerContext();
+            if (layerCtx && layers[currentLayer]) {
+                layerCtx.clearRect(0, 0, layers[currentLayer].canvas.width, layers[currentLayer].canvas.height);
+                redrawCanvas();
+                saveState();
+                showMessage("Layer cleared");
+            }
+        }
+
+        // Enhanced brush preview (optional - shows brush size when hovering)
+        let brushPreview = null;
+
+        function showBrushPreview(e) {
+            if (currentTool !== 'brush' && currentTool !== 'eraser') return;
+            
+            const size = document.getElementById('brushSize').value;
+            const brushTip = document.getElementById('brushTip').value;
+            const pos = getMousePos(e);
+            
+            if (!brushPreview) {
+                brushPreview = document.createElement('div');
+                brushPreview.style.position = 'absolute';
+                brushPreview.style.pointerEvents = 'none';
+                brushPreview.style.border = '1px solid #0078d4';
+                brushPreview.style.zIndex = '15';
+                document.querySelector('.canvas-wrapper').appendChild(brushPreview);
+            }
+            
+            const previewSize = size * zoom;
+            brushPreview.style.width = previewSize + 'px';
+            brushPreview.style.height = previewSize + 'px';
+            brushPreview.style.left = (pos.x * zoom - previewSize/2) + 'px';
+            brushPreview.style.top = (pos.y * zoom - previewSize/2) + 'px';
+            brushPreview.style.borderRadius = brushTip === 'round' ? '50%' : '0';
+            brushPreview.style.display = 'block';
+        }
+
+        function hideBrushPreview() {
+            if (brushPreview) {
+                brushPreview.style.display = 'none';
+            }
         }
 
         // Initialize the editor
