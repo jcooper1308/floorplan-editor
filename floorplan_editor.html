@@ -532,37 +532,68 @@
             // Tool selection
             document.querySelectorAll('.tool-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
-                    document.querySelector('.tool-btn.active').classList.remove('active');
-                    e.target.classList.add('active');
-                    currentTool = e.target.dataset.tool;
-                    canvas.style.cursor = getCursor(currentTool);
+                    try {
+                        const activeBtn = document.querySelector('.tool-btn.active');
+                        if (activeBtn) {
+                            activeBtn.classList.remove('active');
+                        }
+                        e.target.classList.add('active');
+                        currentTool = e.target.dataset.tool;
+                        canvas.style.cursor = getCursor(currentTool);
+                    } catch (error) {
+                        console.error('Tool selection error:', error);
+                    }
                 });
             });
 
             // Brush type selection
             document.querySelectorAll('.brush-type-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
-                    document.querySelector('.brush-type-btn.active').classList.remove('active');
-                    e.target.classList.add('active');
-                    currentBrushType = e.target.dataset.type;
+                    try {
+                        const activeBtn = document.querySelector('.brush-type-btn.active');
+                        if (activeBtn) {
+                            activeBtn.classList.remove('active');
+                        }
+                        e.target.classList.add('active');
+                        currentBrushType = e.target.dataset.type;
+                    } catch (error) {
+                        console.error('Brush type selection error:', error);
+                    }
                 });
             });
 
-            // Property value updates
-            document.getElementById('brushSize').addEventListener('input', (e) => {
-                document.getElementById('brushSizeValue').textContent = e.target.value + 'px';
-            });
+            // Property value updates - with safety checks
+            setTimeout(() => {
+                const brushSizeInput = document.getElementById('brushSize');
+                const opacityInput = document.getElementById('opacity');
+                const brushSizeValue = document.getElementById('brushSizeValue');
+                const opacityValue = document.getElementById('opacityValue');
 
-            document.getElementById('opacity').addEventListener('input', (e) => {
-                document.getElementById('opacityValue').textContent = e.target.value + '%';
-            });
+                if (brushSizeInput && brushSizeValue) {
+                    brushSizeInput.addEventListener('input', (e) => {
+                        try {
+                            brushSizeValue.textContent = e.target.value + 'px';
+                        } catch (error) {
+                            console.error('Brush size update error:', error);
+                        }
+                    });
+                }
+
+                if (opacityInput && opacityValue) {
+                    opacityInput.addEventListener('input', (e) => {
+                        try {
+                            opacityValue.textContent = e.target.value + '%';
+                        } catch (error) {
+                            console.error('Opacity update error:', error);
+                        }
+                    });
+                }
+            }, 100);
 
             // Canvas events
             canvas.addEventListener('mousedown', handleMouseDown);
             canvas.addEventListener('mousemove', handleMouseMove);
             canvas.addEventListener('mouseup', handleMouseUp);
-            canvas.addEventListener('mousemove', showBrushPreview);
-            canvas.addEventListener('mouseleave', hideBrushPreview);
             canvas.addEventListener('wheel', handleWheel);
 
             // Keyboard shortcuts
@@ -826,9 +857,14 @@
         }
 
         function setupBrush() {
-            const size = document.getElementById('brushSize').value;
-            const color = document.getElementById('brushColor').value;
-            const opacity = document.getElementById('opacity').value / 100;
+            const brushSizeInput = document.getElementById('brushSize');
+            const brushColorInput = document.getElementById('brushColor');
+            const opacityInput = document.getElementById('opacity');
+            
+            // Use default values if elements don't exist
+            const size = brushSizeInput ? parseInt(brushSizeInput.value) || 5 : 5;
+            const color = brushColorInput ? brushColorInput.value : '#000000';
+            const opacity = opacityInput ? (parseInt(opacityInput.value) || 100) / 100 : 1;
             
             // Get the current layer's context
             const layerCtx = getCurrentLayerContext();
@@ -860,8 +896,11 @@
         }
 
         function drawRect(x1, y1, x2, y2) {
-            const color = document.getElementById('brushColor').value;
-            const opacity = document.getElementById('opacity').value / 100;
+            const brushColorInput = document.getElementById('brushColor');
+            const opacityInput = document.getElementById('opacity');
+            
+            const color = brushColorInput ? brushColorInput.value : '#000000';
+            const opacity = opacityInput ? (parseInt(opacityInput.value) || 100) / 100 : 1;
             const layerCtx = getCurrentLayerContext();
             if (!layerCtx) return;
             
@@ -873,8 +912,11 @@
         }
 
         function drawCircle(x1, y1, x2, y2) {
-            const color = document.getElementById('brushColor').value;
-            const opacity = document.getElementById('opacity').value / 100;
+            const brushColorInput = document.getElementById('brushColor');
+            const opacityInput = document.getElementById('opacity');
+            
+            const color = brushColorInput ? brushColorInput.value : '#000000';
+            const opacity = opacityInput ? (parseInt(opacityInput.value) || 100) / 100 : 1;
             const radius = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
             const layerCtx = getCurrentLayerContext();
             if (!layerCtx) return;
@@ -889,8 +931,11 @@
         }
 
         function drawLine(x1, y1, x2, y2) {
-            const color = document.getElementById('brushColor').value;
-            const opacity = document.getElementById('opacity').value / 100;
+            const brushColorInput = document.getElementById('brushColor');
+            const opacityInput = document.getElementById('opacity');
+            
+            const color = brushColorInput ? brushColorInput.value : '#000000';
+            const opacity = opacityInput ? (parseInt(opacityInput.value) || 100) / 100 : 1;
             const layerCtx = getCurrentLayerContext();
             if (!layerCtx) return;
             
@@ -1407,8 +1452,11 @@
 
         // Flood fill function
         function floodFill(startX, startY) {
-            const fillColor = hexToRgb(document.getElementById('brushColor').value);
-            const opacity = document.getElementById('opacity').value / 100;
+            const brushColorInput = document.getElementById('brushColor');
+            const opacityInput = document.getElementById('opacity');
+            
+            const fillColor = hexToRgb(brushColorInput ? brushColorInput.value : '#000000');
+            const opacity = opacityInput ? (parseInt(opacityInput.value) || 100) / 100 : 1;
             const layerCtx = getCurrentLayerContext();
             if (!layerCtx) return;
             
@@ -1597,30 +1645,65 @@
 
         // Tool switching
         function switchToTool(toolName) {
-            document.querySelector('.tool-btn.active').classList.remove('active');
-            const toolBtn = document.querySelector(`[data-tool="${toolName}"]`);
-            if (toolBtn) {
-                toolBtn.classList.add('active');
-                currentTool = toolName;
-                canvas.style.cursor = getCursor(currentTool);
+            try {
+                const activeBtn = document.querySelector('.tool-btn.active');
+                if (activeBtn) {
+                    activeBtn.classList.remove('active');
+                }
+                
+                const toolBtn = document.querySelector(`[data-tool="${toolName}"]`);
+                if (toolBtn) {
+                    toolBtn.classList.add('active');
+                    currentTool = toolName;
+                    canvas.style.cursor = getCursor(currentTool);
+                }
+            } catch (error) {
+                console.error('Switch tool error:', error);
             }
         }
 
         // Brush size controls
+        // Brush size controls
         function increaseBrushSize() {
-            const brushSizeInput = document.getElementById('brushSize');
-            const currentSize = parseInt(brushSizeInput.value);
-            const newSize = Math.min(50, currentSize + 2);
-            brushSizeInput.value = newSize;
-            showMessage(`Brush size: ${newSize}px`);
+            try {
+                const brushSizeInput = document.getElementById('brushSize');
+                if (brushSizeInput) {
+                    const currentSize = parseInt(brushSizeInput.value) || 5;
+                    const newSize = Math.min(50, currentSize + 2);
+                    brushSizeInput.value = newSize;
+                    
+                    // Update the display value
+                    const brushSizeValue = document.getElementById('brushSizeValue');
+                    if (brushSizeValue) {
+                        brushSizeValue.textContent = newSize + 'px';
+                    }
+                    
+                    showMessage(`Brush size: ${newSize}px`);
+                }
+            } catch (error) {
+                console.error('Increase brush size error:', error);
+            }
         }
 
         function decreaseBrushSize() {
-            const brushSizeInput = document.getElementById('brushSize');
-            const currentSize = parseInt(brushSizeInput.value);
-            const newSize = Math.max(1, currentSize - 2);
-            brushSizeInput.value = newSize;
-            showMessage(`Brush size: ${newSize}px`);
+            try {
+                const brushSizeInput = document.getElementById('brushSize');
+                if (brushSizeInput) {
+                    const currentSize = parseInt(brushSizeInput.value) || 5;
+                    const newSize = Math.max(1, currentSize - 2);
+                    brushSizeInput.value = newSize;
+                    
+                    // Update the display value
+                    const brushSizeValue = document.getElementById('brushSizeValue');
+                    if (brushSizeValue) {
+                        brushSizeValue.textContent = newSize + 'px';
+                    }
+                    
+                    showMessage(`Brush size: ${newSize}px`);
+                }
+            } catch (error) {
+                console.error('Decrease brush size error:', error);
+            }
         }
 
         // Message system
