@@ -906,12 +906,12 @@
             isDrawing = true;
 
             // Check if clicking inside existing selection for moving
-            if (selection && currentTool === 'select') {
+            if (selection && (currentTool === 'select' || currentTool === 'move')) {
                 if (pos.x >= selection.x && pos.x <= selection.x + selection.width &&
                     pos.y >= selection.y && pos.y <= selection.y + selection.height) {
                     transforming = true;
                     originalSelection = { ...selection };
-                    console.log('Starting move transform');
+                    console.log('Starting move transform at:', pos.x, pos.y);
                     return;
                 }
             }
@@ -959,19 +959,26 @@
                 return;
             }
 
-            // Only handle canvas-related moves if mouse is over canvas
-            if (e.target === canvas) {
+            // Handle mouse movement for canvas interactions
+            if (e.target === canvas || transforming || isDrawing) {
                 const pos = getMousePos(e);
                 const currentX = pos.x;
                 const currentY = pos.y;
 
                 // Handle moving selection
-                if (transforming && selection) {
+                if (transforming && selection && originalSelection) {
                     const deltaX = currentX - startX;
                     const deltaY = currentY - startY;
-                    selection.x = Math.max(0, originalSelection.x + deltaX);
-                    selection.y = Math.max(0, originalSelection.y + deltaY);
+                    
+                    // Calculate new position with bounds checking
+                    const newX = Math.max(0, Math.min(canvas.width - selection.width, originalSelection.x + deltaX));
+                    const newY = Math.max(0, Math.min(canvas.height - selection.height, originalSelection.y + deltaY));
+                    
+                    selection.x = newX;
+                    selection.y = newY;
+                    
                     updateSelectionDisplay();
+                    console.log('Moving selection to:', selection.x, selection.y);
                     return;
                 }
 
@@ -1017,8 +1024,14 @@
 
             if (transforming) {
                 transforming = false;
+                console.log('Move ended - final position:', selection.x, selection.y);
+                
+                // When moving is finished, update the actual layer content
+                if (selection && originalSelection) {
+                    moveLayerContent(originalSelection, selection);
+                }
+                
                 originalSelection = null;
-                console.log('Move ended');
                 saveState('Move');
                 return;
             }
@@ -1059,6 +1072,31 @@
             } else if (currentTool === 'select') {
                 finalizeSelection();
             }
+        }
+
+        function moveLayerContent(oldBounds, newBounds) {
+            const layerCtx = getCurrentLayerContext();
+            if (!layerCtx) return;
+            
+            // Store the content from the old location
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = oldBounds.width;
+            tempCanvas.height = oldBounds.height;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.drawImage(layerCtx.canvas, 
+                            oldBounds.x, oldBounds.y, oldBounds.width, oldBounds.height,
+                            0, 0, oldBounds.width, oldBounds.height);
+            
+            // Clear the entire current layer
+            layerCtx.clearRect(0, 0, layerCtx.canvas.width, layerCtx.canvas.height);
+            
+            // Put the content at the new location
+            layerCtx.drawImage(tempCanvas, newBounds.x, newBounds.y);
+            
+            // Redraw the main canvas
+            redrawCanvas();
+            
+            console.log('Moved layer content from', oldBounds.x, oldBounds.y, 'to', newBounds.x, newBounds.y);
         }
 
         function startResize(e) {
@@ -1151,9 +1189,6 @@
             selection.y = Math.max(0, newY);
             selection.width = newWidth;
             selection.height = newHeight;
-            
-            // Redraw the fixture at the new size
-            redrawFixtureAtSelection();
             
             updateSelectionDisplay();
         }
@@ -1423,6 +1458,47 @@
                 shiftPressed = true;
             }
 
+            // Arrow key movement for selection
+            if (selection && (currentTool === 'select')) {
+                const moveDistance = e.shiftKey ? 10 : 1; // Hold shift for faster movement
+                let moved = false;
+                
+                switch(e.key) {
+                    case 'ArrowLeft':
+                        e.preventDefault();
+                        if (selection.x > 0) {
+                            moveSelectionBy(-moveDistance, 0);
+                            moved = true;
+                        }
+                        break;
+                    case 'ArrowRight':
+                        e.preventDefault();
+                        if (selection.x + selection.width < canvas.width) {
+                            moveSelectionBy(moveDistance, 0);
+                            moved = true;
+                        }
+                        break;
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        if (selection.y > 0) {
+                            moveSelectionBy(0, -moveDistance);
+                            moved = true;
+                        }
+                        break;
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        if (selection.y + selection.height < canvas.height) {
+                            moveSelectionBy(0, moveDistance);
+                            moved = true;
+                        }
+                        break;
+                }
+                
+                if (moved) {
+                    return; // Don't process other shortcuts when moving
+                }
+            }
+
             if (e.ctrlKey || e.metaKey) {
                 switch(e.key.toLowerCase()) {
                     case 'z':
@@ -1453,6 +1529,10 @@
                         e.preventDefault();
                         pasteSelection();
                         break;
+                    case 'j':
+                        e.preventDefault();
+                        pasteSelectionToNewLayer();
+                        break;
                     case 'a':
                         e.preventDefault();
                         selectAll();
@@ -1460,10 +1540,6 @@
                     case 'd':
                         e.preventDefault();
                         deselectAll();
-                        break;
-                    case 'j':
-                        e.preventDefault();
-                        duplicateLayer();
                         break;
                     case 'e':
                         e.preventDefault();
@@ -1486,11 +1562,11 @@
                     break;
                 case 'v':
                     if (!e.ctrlKey && !e.metaKey) {
-                        switchToTool('select');
+                        switchToTool('move');
                     }
                     break;
                 case 'm':
-                    switchToTool('move');
+                    switchToTool('select');
                     break;
                 case 'b':
                     switchToTool('brush');
@@ -1521,6 +1597,72 @@
                     increaseBrushSize();
                     break;
             }
+        }
+
+        function moveSelectionBy(deltaX, deltaY) {
+            if (!selection) return;
+            
+            const oldBounds = { ...selection };
+            
+            // Update selection position
+            selection.x = Math.max(0, Math.min(canvas.width - selection.width, selection.x + deltaX));
+            selection.y = Math.max(0, Math.min(canvas.height - selection.height, selection.y + deltaY));
+            
+            // Move the actual layer content
+            moveLayerContent(oldBounds, selection);
+            
+            // Update visual display
+            updateSelectionDisplay();
+            
+            showMessage(`Moved ${Math.abs(deltaX) || Math.abs(deltaY)} pixels`);
+        }
+
+        function pasteSelectionToNewLayer() {
+            if (!selection) {
+                showMessage("No selection to paste to new layer");
+                return;
+            }
+            
+            // Copy the current selection first
+            copySelection();
+            
+            if (!clipboard) {
+                showMessage("Failed to copy selection");
+                return;
+            }
+            
+            // Create a new layer for the selection
+            const layerCanvas = document.createElement('canvas');
+            layerCanvas.width = canvas.width;
+            layerCanvas.height = canvas.height;
+            
+            const layer = {
+                id: Date.now(),
+                name: `Selection Copy`,
+                canvas: layerCanvas,
+                visible: true,
+                opacity: 1
+            };
+            
+            layers.push(layer);
+            currentLayer = layers.length - 1;
+            updateLayersList();
+            
+            const layerCtx = layerCanvas.getContext('2d');
+            
+            // Put the selection content on the new layer at the same position
+            layerCtx.drawImage(clipboard.canvas, selection.x, selection.y);
+            
+            console.log('Selection copied to new layer at:', selection.x, selection.y);
+            
+            // Switch to move tool for immediate movement
+            switchToTool('move');
+            
+            // Keep the same selection active for immediate movement
+            showTransformHandles();
+            redrawCanvas();
+            saveState('Selection to New Layer');
+            showMessage("Selection copied to new layer - use V (move) or arrows to move");
         }
 
         function handleKeyUp(e) {
@@ -2212,7 +2354,7 @@
                    Math.abs(color1.a - color2.a) <= tolerance;
         }
 
-        // Clipboard functionality
+        // Clipboard functionality - completely rebuilt
         let clipboard = null;
 
         function copySelection() {
@@ -2221,17 +2363,31 @@
                 return;
             }
             
-            const layerCtx = getCurrentLayerContext();
-            if (!layerCtx) return;
+            // First, create a composite image of all visible layers in the selection area
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = selection.width;
+            tempCanvas.height = selection.height;
+            const tempCtx = tempCanvas.getContext('2d');
             
-            // Get the image data from the current layer
+            // Draw all visible layers onto the temp canvas
+            layers.forEach(layer => {
+                if (layer.visible) {
+                    tempCtx.globalAlpha = layer.opacity;
+                    tempCtx.drawImage(layer.canvas, 
+                                    selection.x, selection.y, selection.width, selection.height,
+                                    0, 0, selection.width, selection.height);
+                }
+            });
+            tempCtx.globalAlpha = 1;
+            
+            // Store the canvas data
             clipboard = {
-                imageData: layerCtx.getImageData(selection.x, selection.y, selection.width, selection.height),
+                canvas: tempCanvas,
                 width: selection.width,
-                height: selection.height,
-                originalLayer: currentLayer
+                height: selection.height
             };
             
+            console.log('Copied selection:', clipboard.width, 'x', clipboard.height);
             showMessage("Selection copied");
         }
 
@@ -2252,6 +2408,8 @@
                 return;
             }
             
+            console.log('Pasting:', clipboard.width, 'x', clipboard.height);
+            
             // Create a new layer for the pasted content
             const layerCanvas = document.createElement('canvas');
             layerCanvas.width = canvas.width;
@@ -2269,15 +2427,16 @@
             currentLayer = layers.length - 1;
             updateLayersList();
             
-            const layerCtx = getCurrentLayerContext();
-            if (!layerCtx) return;
+            const layerCtx = layerCanvas.getContext('2d');
             
-            // Paste at center of canvas or offset from original
-            const pasteX = canvas.width / 2 - clipboard.width / 2;
-            const pasteY = canvas.height / 2 - clipboard.height / 2;
+            // Paste at center of canvas
+            const pasteX = Math.max(0, (canvas.width - clipboard.width) / 2);
+            const pasteY = Math.max(0, (canvas.height - clipboard.height) / 2);
             
-            // Put the clipboard image data onto the new layer
-            layerCtx.putImageData(clipboard.imageData, pasteX, pasteY);
+            // Draw the clipboard content onto the new layer
+            layerCtx.drawImage(clipboard.canvas, pasteX, pasteY);
+            
+            console.log('Pasted at:', pasteX, pasteY);
             
             // Create new selection at paste location
             selection = {
@@ -2287,11 +2446,25 @@
                 height: clipboard.height
             };
             
-            // Update visuals
+            // Show selection box
+            const selectionBox = document.getElementById('selectionBox');
+            selectionBox.style.left = (selection.x * zoom) + 'px';
+            selectionBox.style.top = (selection.y * zoom) + 'px';
+            selectionBox.style.width = (selection.width * zoom) + 'px';
+            selectionBox.style.height = (selection.height * zoom) + 'px';
+            selectionBox.style.display = 'block';
+            
+            // Show transform handles
             showTransformHandles();
+            
+            // Update canvas display
             redrawCanvas();
+            
+            // Switch to select tool
+            switchToTool('select');
+            
             saveState('Paste');
-            showMessage("Pasted to new layer");
+            showMessage("Pasted to new layer - ready to move");
         }
 
         function selectAll() {
