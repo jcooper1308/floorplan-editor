@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Floorplan Editor</title>
+    <title>Floorplan Editor - index.html</title>
     <style>
         * {
             margin: 0;
@@ -334,17 +334,17 @@
             <div class="canvas-container">
                 <div class="canvas-wrapper">
                     <canvas id="canvas" width="800" height="600"></canvas>
-                </div>
-                <div class="selection-box" id="selectionBox"></div>
-                <div class="transform-handles" id="transformHandles">
-                    <div class="handle nw"></div>
-                    <div class="handle n"></div>
-                    <div class="handle ne"></div>
-                    <div class="handle e"></div>
-                    <div class="handle se"></div>
-                    <div class="handle s"></div>
-                    <div class="handle sw"></div>
-                    <div class="handle w"></div>
+                    <div class="selection-box" id="selectionBox"></div>
+                    <div class="transform-handles" id="transformHandles">
+                        <div class="handle nw"></div>
+                        <div class="handle n"></div>
+                        <div class="handle ne"></div>
+                        <div class="handle e"></div>
+                        <div class="handle se"></div>
+                        <div class="handle s"></div>
+                        <div class="handle sw"></div>
+                        <div class="handle w"></div>
+                    </div>
                 </div>
                 <div class="zoom-controls">
                     <button class="zoom-btn" onclick="zoomOut()">-</button>
@@ -452,12 +452,10 @@
 
         function getMousePos(e) {
             const rect = canvas.getBoundingClientRect();
-            const canvasWrapper = document.querySelector('.canvas-wrapper');
-            const wrapperRect = canvasWrapper.getBoundingClientRect();
             
             // Calculate the actual mouse position relative to the canvas
-            const x = (e.clientX - wrapperRect.left) / zoom;
-            const y = (e.clientY - wrapperRect.top) / zoom;
+            const x = (e.clientX - rect.left) / zoom;
+            const y = (e.clientY - rect.top) / zoom;
             
             return { x, y };
         }
@@ -710,8 +708,6 @@
 
         function startSelection(x, y) {
             const selectionBox = document.getElementById('selectionBox');
-            const canvasWrapper = document.querySelector('.canvas-wrapper');
-            const wrapperRect = canvasWrapper.getBoundingClientRect();
             
             selectionBox.style.left = (x * zoom) + 'px';
             selectionBox.style.top = (y * zoom) + 'px';
